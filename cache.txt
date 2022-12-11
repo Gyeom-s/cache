@@ -1,0 +1,157 @@
+package Computer;
+
+import java.io.IOException;
+import java.util.Scanner;
+
+public class CacheSimulator
+{
+
+    public static void main(String[] args) throws IOException
+    {
+        Scanner in = new Scanner(System.in);
+        int numSets, setAssoc;
+
+        do
+        {
+            System.out.print("cache를 입력하세요 (1/32/64/128/256/512): ");
+            numSets = in.nextInt();
+        }
+        while(numSets != 1 && numSets != 32 && numSets != 64 && numSets != 128 && numSets != 256 && numSets != 512);
+
+        do
+        {
+            System.out.print("(1/2/4): ");
+            setAssoc = in.nextInt();
+        }
+        while(setAssoc != 1 && setAssoc != 2 && setAssoc != 4);
+
+        Cache cache = new Cache(numSets, setAssoc);
+        System.out.println("생성됐습니다.!");
+
+        //임의의 파일을 가져옵니다.
+        System.out.print("파일명: ");
+        String datFile = in.next();
+
+
+        in.close();
+        cache.fillFromFile(datFile);
+        cache.printStats();
+    }
+}
+class Cache
+{
+    private Set[] sets;
+    private int setAssoc, hitCount, missCount, totalCount;
+    private double hitRate, missRate;
+
+    public Cache(int passedNumSets, int passedSetAssoc)
+    {
+        this.sets = new Set[passedNumSets];
+        for(int i = 0; i < this.sets.length; i++)
+        {
+            this.sets[i] = new Set(passedSetAssoc);
+        }
+        this.setAssoc = passedSetAssoc;
+        this.hitCount = 0; this.missCount = 0; this.totalCount = 0;
+        this.hitRate = 0.0; this.missRate = 0.0;
+    }
+
+
+    public void fillFromFile(String fileName) throws IOException {
+        Scanner inFile = new Scanner(new File(fileName));
+        while(inFile.hasNextInt())
+        {
+            totalCount++;
+            int addressToRead = inFile.nextInt(); // 읽은 파일의 주소를 읽는다.
+            addressToRead /= 4;
+            int blockAddress = addressToRead / 4;
+            int location = (blockAddress % sets.length); //메모리 주소를 길이로 나눠서 위치를 얻는다.
+            Set setToPlaceAddress = sets[location];
+            boolean isHit = setToPlaceAddress.checkQueue(blockAddress);
+            System.out.println(totalCount + "@" + location + ": " + sets[location]);
+            if(isHit) {
+                hitCount++;
+            }
+            else {
+                missCount++;
+            }
+            System.out.println(isHit);
+        }
+        inFile.close();
+        hitRate = hitCount / (double)totalCount * 100;
+        missRate = missCount / (double)totalCount * 100;
+    }
+class Set {
+    private Queue<Integer> blocks; //집합 안에 데이터를 설정한다.
+    private int setLength;
+
+
+    public Set(int setLength)
+    {
+        this.setLength = setLength;
+        blocks = new ArrayDeque<Integer>();
+    }
+
+
+    public boolean checkQueue(int blockAddress) {
+        if(blocks.contains(blockAddress)) { //주소를 배열에 있다면
+            updateQueue(blockAddress); //최근 사용했던 곳으로 업데이트
+            return true;
+        }
+        insertWithLRU(blockAddress); //주소를 넣는다.
+        return false;
+    }
+
+
+    private void updateQueue(int mostRecent) {
+        Iterator<Integer> queueIterator = blocks.iterator();
+        while(queueIterator.hasNext()) { //계속 검색하여 원하는 값을 찾는다면 멈춥니다.
+            int addressToCheck = queueIterator.next();
+            if(addressToCheck == mostRecent) {
+                queueIterator.remove();
+                break;
+            }
+        }
+        blocks.add(mostRecent);
+    }
+
+
+    private void insertWithLRU(int address) {
+        if(blocks.size() >= setLength) { //가득 차면 제거한다.
+            blocks.remove();
+        }
+        blocks.add(address);
+    }
+
+    public String toString() {
+        String str = "[";
+        Iterator<Integer> queueIterator = blocks.iterator();
+        while(queueIterator.hasNext()) {
+            str += queueIterator.next() + ", ";
+        }
+        return str;
+    }
+}
+
+    public int getSetAssoc() {
+        return setAssoc;
+    }
+
+    public void printStats() {
+        System.out.println("Cache\n-----------------");
+        System.out.println(this);
+        System.out.println("Hit Count: " + hitCount);
+        System.out.println("Miss Count: " + missCount);
+        System.out.println("Hit Rate: " + hitRate);
+        System.out.println("Miss Rate: " + missRate);
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cache : " + sets.length + "\n");
+        sb.append("연관 집합 : " + setAssoc + "\n");
+        sb.append("블럭 크기 : 4");
+
+        return sb.toString();
+    }
+}
